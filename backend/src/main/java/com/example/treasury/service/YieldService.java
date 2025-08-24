@@ -115,62 +115,117 @@ public class YieldService {
   }
 
   private List<YieldPoint> extractLatestCurve(String xml, LocalDate onOrBefore) {
-    List<String> entries = new ArrayList<>();
-    Matcher m = Pattern.compile("<entry>(.*?)</entry>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE).matcher(xml == null ? "" : xml);
-    while (m.find()) entries.add(m.group(1));
+    if (xml == null || xml.isBlank()) return List.of();
 
-    LocalDate bestDate = null;
-    Map<String, Double> best = null;
-
-    for (String entry : entries) {
-      String dateStr = matchFirst(entry, "<d:(NEW_DATE|CMTDATE|DATE)[^>]*>(.*?)</d:\\1>");
-      if (dateStr == null) continue;
-      String justDate = dateStr.split("T")[0];
-      LocalDate d;
+    try {
+      javax.xml.parsers.DocumentBuilderFactory dbf = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+      dbf.setNamespaceAware(true);
+      dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      // Harden against XXE/DTD; ignore if impl doesn't support the flag
       try {
-        d = LocalDate.parse(justDate);
-      } catch (Exception e) {
-        continue;
-      }
-      if (d.isAfter(onOrBefore)) continue;
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      } catch (javax.xml.parsers.ParserConfigurationException ignored) {}
 
-      Map<String, Double> map = new HashMap<>();
-      Matcher kv = Pattern.compile("<d:(BC_[A-Z0-9_]+)[^>]*>(.*?)</d:\\1>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE).matcher(entry);
-      while (kv.find()) {
-        String key = kv.group(1).toUpperCase(Locale.ROOT);
-        String val = kv.group(2).trim();
-        if (val.equalsIgnoreCase("N/A") || val.isEmpty()) continue;
+      javax.xml.parsers.DocumentBuilder db = dbf.newDocumentBuilder();
+      org.w3c.dom.Document doc = db.parse(new org.xml.sax.InputSource(new java.io.StringReader(xml)));
+
+      javax.xml.xpath.XPathFactory xpf = javax.xml.xpath.XPathFactory.newInstance();
+      javax.xml.xpath.XPath xp = xpf.newXPath();
+      xp.setNamespaceContext(new SimpleNsContext());
+
+      // Entries under Atom namespace
+      org.w3c.dom.NodeList entries = (org.w3c.dom.NodeList)
+          xp.evaluate("//a:entry", doc, javax.xml.xpath.XPathConstants.NODESET);
+      if (entries == null || entries.getLength() == 0) {
+        // Fallback if prefixes are missing
+        entries = (org.w3c.dom.NodeList)
+            xp.evaluate("//*[local-name()='entry']", doc, javax.xml.xpath.XPathConstants.NODESET);
+      }
+
+      java.time.LocalDate bestDate = null;
+      java.util.Map<String, Double> best = null;
+
+      for (int i = 0; i < entries.getLength(); i++) {
+        org.w3c.dom.Node entry = entries.item(i);
+
+        // Try multiple possible date fields seen in the feed
+        String dateStr = (String) xp.evaluate(
+            "string(.//d:NEW_DATE | .//d:CMTDATE | .//d:DATE)",
+            entry, javax.xml.xpath.XPathConstants.STRING);
+
+        if (dateStr == null || dateStr.isBlank()) continue;
+        String justDate = dateStr.split("T")[0].trim();
+
+        java.time.LocalDate d;
         try {
-          map.put(key, Double.parseDouble(val));
-        } catch (NumberFormatException ignored) {}
+          d = java.time.LocalDate.parse(justDate);
+        } catch (Exception ex) {
+          continue;
+        }
+        if (d.isAfter(onOrBefore)) continue;
+
+        // Collect all yield fields d:BC_*
+        org.w3c.dom.NodeList bcNodes = (org.w3c.dom.NodeList)
+            xp.evaluate(".//d:*[starts-with(local-name(),'BC_')]",
+                entry, javax.xml.xpath.XPathConstants.NODESET);
+
+        java.util.Map<String, Double> map = new java.util.HashMap<>();
+        for (int j = 0; j < bcNodes.getLength(); j++) {
+          org.w3c.dom.Element el = (org.w3c.dom.Element) bcNodes.item(j);
+          String key = el.getLocalName(); // e.g., BC_2YEAR
+          String text = el.getTextContent() != null ? el.getTextContent().trim() : "";
+          if (text.isEmpty() || "N/A".equalsIgnoreCase(text)) continue;
+          try {
+            map.put(key, Double.parseDouble(text));
+          } catch (NumberFormatException ignored) {}
+        }
+
+        if (!map.isEmpty() && (bestDate == null || d.isAfter(bestDate))) {
+          bestDate = d;
+          best = map;
+        }
       }
 
-      if (!map.isEmpty() && (bestDate == null || d.isAfter(bestDate))) {
-        bestDate = d;
-        best = map;
+      if (best == null) return List.of();
+
+      java.util.List<YieldPoint> pts = new java.util.ArrayList<>();
+      for (var e : FIELD_TO_LABEL.entrySet()) {
+        Double v = best.get(e.getKey());
+        if (v != null) pts.add(new YieldPoint(e.getValue(), v.floatValue()));
       }
+      return pts;
+    } catch (Exception e) {
+      log.warn("XML parse error (DOM/XPath): {}", e.toString());
+      return List.of();
     }
-
-    if (best == null) return List.of();
-
-    List<YieldPoint> pts = new ArrayList<>();
-    for (var e : FIELD_TO_LABEL.entrySet()) {
-      Double v = best.get(e.getKey());
-      if (v != null) pts.add(new YieldPoint(e.getValue(), v.floatValue()));
-    }
-    return pts;
   }
 
   private List<YieldPoint> orderCanonically(List<YieldPoint> pts) {
     if (pts == null || pts.isEmpty()) return List.of();
-    Map<String, YieldPoint> by = pts.stream().collect(Collectors.toMap(YieldPoint::getTerm, p -> p, (a,b)->a));
-    List<YieldPoint> ordered = new ArrayList<>();
-    for (String t : CANONICAL_ORDER) if (by.containsKey(t)) ordered.add(by.get(t));
+    java.util.Map<String, YieldPoint> by =
+        pts.stream().collect(java.util.stream.Collectors.toMap(YieldPoint::getTerm, p -> p, (a, b) -> a));
+    java.util.List<YieldPoint> ordered = new java.util.ArrayList<>();
+    for (String t : CANONICAL_ORDER) {
+      YieldPoint p = by.get(t);
+      if (p != null) ordered.add(p);
+    }
     return ordered;
   }
 
-  private static String matchFirst(String text, String regex) {
-    Matcher m = Pattern.compile(regex, Pattern.DOTALL | Pattern.CASE_INSENSITIVE).matcher(text);
-    return m.find() ? m.group(2).trim() : null;
+  // Minimal namespace context for Atom + OData used by the Treasury feed
+  private static final class SimpleNsContext implements javax.xml.namespace.NamespaceContext {
+    @Override
+    public String getNamespaceURI(String prefix) {
+      if ("a".equals(prefix)) return "http://www.w3.org/2005/Atom";
+      if ("m".equals(prefix)) return "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata";
+      if ("d".equals(prefix)) return "http://schemas.microsoft.com/ado/2007/08/dataservices";
+      return javax.xml.XMLConstants.NULL_NS_URI;
+    }
+    @Override
+    public String getPrefix(String namespaceURI) { return null; }
+    @Override
+    public java.util.Iterator<String> getPrefixes(String namespaceURI) {
+      return java.util.Collections.emptyIterator();
+    }
   }
 }
