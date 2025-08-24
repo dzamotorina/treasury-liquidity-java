@@ -1,0 +1,13 @@
+# Java
+target/
+*.log
+
+# Node/Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# IDE
+.idea/
+.vscode/
