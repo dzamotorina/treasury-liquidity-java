@@ -1,0 +1,1 @@
+{"ast":null,"code":"export const routes = [{\n  path: '',\n  loadComponent: () => import('./yield-curve.component').then(m => m.YieldCurveComponent)\n}, {\n  path: 'orders',\n  loadComponent: () => import('./order-history.component').then(m => m.OrderHistoryComponent)\n}];","map":null,"metadata":{},"sourceType":"module","externalDependencies":[]}
