@@ -19,5 +19,5 @@ public class Order {
   private BigDecimal amount;
   private Instant createdAt;
   private String status;
-  private Double rateAtSubmission; // nullable
+  private Double rateAtSubmission;
 }
