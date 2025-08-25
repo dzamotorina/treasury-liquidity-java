@@ -35,11 +35,47 @@ class YieldServiceTest {
             .baseUrl(mockWebServer.url("/").toString())
             .build();
         ReflectionTestUtils.setField(yieldService, "http", testWebClient);
+        // Ensure service targets the mock server (so requests are counted)
+        ReflectionTestUtils.setField(yieldService, "treasuryEndpointBase", mockWebServer.url("/").toString());
     }
 
     @AfterEach
     void tearDown() throws IOException {
         mockWebServer.shutdown();
+    }
+
+    @Test
+    void testGetYieldCurve_Cache() {
+        // Given
+        String mockXml = createMockTreasuryXml();
+        mockWebServer.enqueue(new MockResponse()
+            .setBody(mockXml)
+            .setResponseCode(200));
+
+        // When - first call
+        Mono<List<YieldPoint>> firstCall = yieldService.getYieldCurve();
+        
+        // Then - verify first call
+        StepVerifier.create(firstCall)
+            .assertNext(yieldPoints -> {
+                assertNotNull(yieldPoints);
+                assertFalse(yieldPoints.isEmpty());
+            })
+            .verifyComplete();
+
+        // When - second call (should use cache, no new HTTP request)
+        Mono<List<YieldPoint>> secondCall = yieldService.getYieldCurve();
+        
+        // Then - verify second call returns cached data
+        StepVerifier.create(secondCall)
+            .assertNext(yieldPoints -> {
+                assertNotNull(yieldPoints);
+                assertFalse(yieldPoints.isEmpty());
+            })
+            .verifyComplete();
+
+        // Verify only one HTTP request was made
+        assertEquals(1, mockWebServer.getRequestCount());
     }
 
     @Test
@@ -97,40 +133,6 @@ class YieldServiceTest {
                 assertTrue(yieldPoints.isEmpty());
             })
             .verifyComplete();
-    }
-
-    @Test
-    void testGetYieldCurve_Cache() {
-        // Given
-        String mockXml = createMockTreasuryXml();
-        mockWebServer.enqueue(new MockResponse()
-            .setBody(mockXml)
-            .setResponseCode(200));
-
-        // When - first call
-        Mono<List<YieldPoint>> firstCall = yieldService.getYieldCurve();
-        
-        // Then - verify first call
-        StepVerifier.create(firstCall)
-            .assertNext(yieldPoints -> {
-                assertNotNull(yieldPoints);
-                assertFalse(yieldPoints.isEmpty());
-            })
-            .verifyComplete();
-
-        // When - second call (should use cache, no new HTTP request)
-        Mono<List<YieldPoint>> secondCall = yieldService.getYieldCurve();
-        
-        // Then - verify second call returns cached data
-        StepVerifier.create(secondCall)
-            .assertNext(yieldPoints -> {
-                assertNotNull(yieldPoints);
-                assertFalse(yieldPoints.isEmpty());
-            })
-            .verifyComplete();
-
-        // Verify only one HTTP request was made
-        assertEquals(1, mockWebServer.getRequestCount());
     }
 
     @Test

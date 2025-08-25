@@ -7,9 +7,6 @@ import reactor.core.publisher.Mono;
 
 import java.time.*;
 import java.util.*;
-import java.util.concurrent.TimeoutException;
-import java.util.regex.*;
-import java.util.stream.Collectors;
 
 /**
  * Fetches the Daily Treasury Par Yield Curve via the official Treasury XML feed
@@ -25,6 +22,9 @@ public class YieldService {
   private final WebClient http;
   private volatile List<YieldPoint> cache = null;
   private volatile Instant lastFetch = Instant.EPOCH;
+
+  // Configurable base endpoint (overridden in tests to point to MockWebServer)
+  private String treasuryEndpointBase = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml";
 
   public YieldService() {
     // Configure timeouts and basic headers (no custom resolver here)
@@ -101,8 +101,8 @@ public class YieldService {
 
   private Mono<String> fetchMonth(LocalDate date) {
     String yyyymm = String.format("%04d%02d", date.getYear(), date.getMonthValue());
-    String url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml"
-        + "?data=daily_treasury_yield_curve&field_tdr_date_value_month=" + yyyymm;
+    // Build URL using the configurable base so tests can redirect to MockWebServer
+    String url = treasuryEndpointBase + "?data=daily_treasury_yield_curve&field_tdr_date_value_month=" + yyyymm;
     log.debug("Requesting Treasury XML: {}", url);
     return http.get()
         .uri(url)
