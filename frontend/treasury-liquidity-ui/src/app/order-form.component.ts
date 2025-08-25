@@ -31,18 +31,39 @@ export class OrderFormComponent {
   constructor(private http: HttpClient) {}
   
   submit() {
+    // Client-side validation
+    if (this.amount <= 0 || !Number.isFinite(this.amount)) {
+      this.msg = '❌ Amount must be greater than 0';
+      return;
+    }
+
     this.msg = 'Submitting order...';
     const mutation = {
       query: `mutation { createOrder(input: { term: "${this.term}", amount: ${this.amount} }) { id term amount createdAt rateAtSubmission } }`
     };
     
-    this.http.post<{data: {createOrder: any}}>('http://localhost:8080/graphql', mutation)
+    this.http.post<any>('http://localhost:8080/graphql', mutation)
       .subscribe({
         next: (response) => {
+          // GraphQL may return 200 with an "errors" array. Handle that.
+          const gqlErrors = response?.errors;
+          if (Array.isArray(gqlErrors) && gqlErrors.length > 0) {
+            const firstMsg = gqlErrors[0]?.message || 'Request failed';
+            this.msg = `❌ ${firstMsg}`;
+            return;
+          }
+          const created = response?.data?.createOrder;
+          if (!created) {
+            this.msg = '❌ Failed to submit order';
+            return;
+          }
           this.msg = '✅ Order submitted successfully';
           setTimeout(() => this.msg = '', 3000);
         },
-        error: (err) => this.msg = '❌ Failed to submit order'
+        error: (err) => {
+          const serverMsg = err?.error?.errors?.[0]?.message || err?.message || 'Failed to submit order';
+          this.msg = `❌ ${serverMsg}`;
+        }
       });
   }
 }

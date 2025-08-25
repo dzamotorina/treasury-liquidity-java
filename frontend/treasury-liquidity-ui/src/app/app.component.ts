@@ -357,18 +357,38 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   submitOrder() {
     this.orderMessage = 'Submitting order...';
+
+    if (this.orderAmount <= 0 || !Number.isFinite(this.orderAmount)) {
+      this.orderMessage = '❌ Amount must be greater than 0';
+      return;
+    }
+
     const mutation = {
       query: `mutation { createOrder(input: { term: "${this.selectedTerm}", amount: ${this.orderAmount} }) { id term amount createdAt rateAtSubmission } }`
     };
     
-    this.http.post<{data: {createOrder: any}}>('http://localhost:8080/graphql', mutation)
+    this.http.post<any>('http://localhost:8080/graphql', mutation)
       .subscribe({
         next: (response) => {
+          const gqlErrors = response?.errors;
+          if (Array.isArray(gqlErrors) && gqlErrors.length > 0) {
+            const firstMsg = gqlErrors[0]?.message || 'Request failed';
+            this.orderMessage = `❌ ${firstMsg}`;
+            return;
+          }
+          const created = response?.data?.createOrder;
+          if (!created) {
+            this.orderMessage = '❌ Failed to submit order';
+            return;
+          }
           this.orderMessage = '✅ Order submitted successfully';
           setTimeout(() => this.orderMessage = '', 3000);
-          this.loadOrders(); // Refresh orders
+          this.loadOrders();
         },
-        error: (err) => this.orderMessage = '❌ Failed to submit order'
+        error: (err) => {
+          const serverMsg = err?.error?.errors?.[0]?.message || err?.message || 'Failed to submit order';
+          this.orderMessage = `❌ ${serverMsg}`;
+        }
       });
   }
 
