@@ -72,6 +72,37 @@
       <classifier>osx-aarch_64</classifier>
       <scope>runtime</scope>
     </dependency>
+
+    <!-- Add or update these dependencies in your <dependencies> section -->
+
+    <!-- Spring Boot Test Starter (includes JUnit 5, Mockito, AssertJ, etc.) -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- Reactor Test (for StepVerifier) -->
+    <dependency>
+        <groupId>io.projectreactor</groupId>
+        <artifactId>reactor-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- MockWebServer for HTTP mocking -->
+    <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>mockwebserver</artifactId>
+        <version>4.12.0</version>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- Spring WebFlux Test -->
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-webflux</artifactId>
+        <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
