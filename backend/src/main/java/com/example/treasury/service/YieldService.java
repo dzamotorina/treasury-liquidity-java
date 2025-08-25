@@ -131,16 +131,11 @@ public class YieldService {
 
       javax.xml.xpath.XPathFactory xpf = javax.xml.xpath.XPathFactory.newInstance();
       javax.xml.xpath.XPath xp = xpf.newXPath();
-      xp.setNamespaceContext(new SimpleNsContext());
+      // Removed dependency on namespace context; use local-name() instead
 
-      // Entries under Atom namespace
+      // Entries (namespace-agnostic)
       org.w3c.dom.NodeList entries = (org.w3c.dom.NodeList)
-          xp.evaluate("//a:entry", doc, javax.xml.xpath.XPathConstants.NODESET);
-      if (entries == null || entries.getLength() == 0) {
-        // Fallback if prefixes are missing
-        entries = (org.w3c.dom.NodeList)
-            xp.evaluate("//*[local-name()='entry']", doc, javax.xml.xpath.XPathConstants.NODESET);
-      }
+          xp.evaluate("//*[local-name()='entry']", doc, javax.xml.xpath.XPathConstants.NODESET);
 
       java.time.LocalDate bestDate = null;
       java.util.Map<String, Double> best = null;
@@ -148,9 +143,9 @@ public class YieldService {
       for (int i = 0; i < entries.getLength(); i++) {
         org.w3c.dom.Node entry = entries.item(i);
 
-        // Try multiple possible date fields seen in the feed
+        // Try multiple possible date fields seen in the feed (namespace-agnostic)
         String dateStr = (String) xp.evaluate(
-            "string(.//d:NEW_DATE | .//d:CMTDATE | .//d:DATE)",
+            "string(.//*[local-name()='NEW_DATE' or local-name()='CMTDATE' or local-name()='DATE'])",
             entry, javax.xml.xpath.XPathConstants.STRING);
 
         if (dateStr == null || dateStr.isBlank()) continue;
@@ -164,9 +159,9 @@ public class YieldService {
         }
         if (d.isAfter(onOrBefore)) continue;
 
-        // Collect all yield fields d:BC_*
+        // Collect all yield fields BC_* (namespace-agnostic)
         org.w3c.dom.NodeList bcNodes = (org.w3c.dom.NodeList)
-            xp.evaluate(".//d:*[starts-with(local-name(),'BC_')]",
+            xp.evaluate(".//*[starts-with(local-name(),'BC_')]",
                 entry, javax.xml.xpath.XPathConstants.NODESET);
 
         java.util.Map<String, Double> map = new java.util.HashMap<>();
@@ -213,19 +208,5 @@ public class YieldService {
   }
 
   // Minimal namespace context for Atom + OData used by the Treasury feed
-  private static final class SimpleNsContext implements javax.xml.namespace.NamespaceContext {
-    @Override
-    public String getNamespaceURI(String prefix) {
-      if ("a".equals(prefix)) return "http://www.w3.org/2005/Atom";
-      if ("m".equals(prefix)) return "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata";
-      if ("d".equals(prefix)) return "http://schemas.microsoft.com/ado/2007/08/dataservices";
-      return javax.xml.XMLConstants.NULL_NS_URI;
-    }
-    @Override
-    public String getPrefix(String namespaceURI) { return null; }
-    @Override
-    public java.util.Iterator<String> getPrefixes(String namespaceURI) {
-      return java.util.Collections.emptyIterator();
-    }
-  }
+  // Removed SimpleNsContext to avoid ClassNotFound issues and make XPath namespace-agnostic
 }
