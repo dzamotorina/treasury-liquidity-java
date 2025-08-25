@@ -193,10 +193,11 @@ export class AppComponent implements OnInit, AfterViewInit {
     // Y labels at 3.6..5.0 by 0.2
     ctx.font = '12px system-ui';
     ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = '#495057';
     for (let v = yAxisMin; v <= yAxisMax + 1e-6; v += 0.2) {
       const y = cssHeight - paddingBottom - ((v - yAxisMin) / yAxisRange) * chartHeight;
-      ctx.fillText(v.toFixed(1) + '%', paddingLeft - 15, y + 4);
+      ctx.fillText(v.toFixed(1) + '%', paddingLeft - 15, y);
     }
 
     // Brighter vertical guide lines from each data point to the X axis
@@ -259,14 +260,17 @@ export class AppComponent implements OnInit, AfterViewInit {
       ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Labels — avoid overlapping the curve/axes
+      // Labels — place higher above the curve
       const label = p.value.toFixed(2) + '%';
       ctx.fillStyle = '#495057';
       ctx.font = 'bold 12px system-ui';
 
-      // default above
+      // default above with larger offset
+      const labelOffsetAbove = 32;   // raise labels higher (previously ~14)
+      const minGapFromPoint  = 24;   // ensure minimum distance from the point/line
+
       let labelX = p.x;
-      let labelY = p.y - 14;
+      let labelY = p.y - labelOffsetAbove;
 
       // edges
       if (i === 0) { ctx.textAlign = 'left';  labelX = p.x + 10; }
@@ -276,19 +280,19 @@ export class AppComponent implements OnInit, AfterViewInit {
       // clamp within chart content
       const minY = paddingTop + 16;
       const maxY = cssHeight - paddingBottom - 16;
-      labelY = Math.max(minY, Math.min(maxY, labelY));
-
       const minX = paddingLeft + 10;
       const maxX = cssWidth - paddingRight - 10;
-      labelX = Math.max(minX, Math.min(maxX, labelX));
 
-      // If too close to the curve, push a bit more above
-      if (Math.abs(labelY - p.y) < 12) {
-        labelY = Math.max(minY, p.y - 20);
+      // maintain a minimum gap from the point even after clamping
+      labelY = Math.max(minY, Math.min(maxY, labelY));
+      if (labelY > p.y - minGapFromPoint) {
+        labelY = Math.max(minY, p.y - minGapFromPoint);
       }
 
+      labelX = Math.max(minX, Math.min(maxX, labelX));
+
       ctx.fillText(label, labelX, labelY);
-    });
+    })
 
     // X labels — move closer to the axis (tighter)
     ctx.fillStyle = '#495057';
@@ -299,13 +303,13 @@ export class AppComponent implements OnInit, AfterViewInit {
       ctx.fillText(lab, x, cssHeight - paddingBottom + 24); // was ~ -25, now closer
     });
 
-    // Y labels
-    ctx.font = '12px system-ui';
-    ctx.textAlign = 'right';
-    for (let p = 1; p <= 7; p++) {
-      const y = cssHeight - paddingBottom - ((p - yAxisMin) / yAxisRange) * chartHeight;
-      ctx.fillText(p + '%', paddingLeft - 15, y + 4);
-    }
+    // Remove the duplicate integer Y-axis loop entirely
+    // ctx.font = '12px system-ui';
+    // ctx.textAlign = 'right';
+    // for (let p = 1; p <= 7; p++) {
+    //   const y = cssHeight - paddingBottom - ((p - yAxisMin) / yAxisRange) * chartHeight;
+    //   ctx.fillText(p + '%', paddingLeft - 15, y + 4);
+    // }
 
     // Title and subtitle (same)
     ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
@@ -333,6 +337,14 @@ export class AppComponent implements OnInit, AfterViewInit {
     ctx.textAlign = 'center';
     ctx.fillText('Maturity', cssWidth / 2, cssHeight - 10);
   }
+
+    // Remove the duplicate integer Y-axis loop entirely
+    // ctx.font = '12px system-ui';
+    // ctx.textAlign = 'right';
+    // for (let p = 1; p <= 7; p++) {
+    //   const y = cssHeight - paddingBottom - ((p - yAxisMin) / yAxisRange) * chartHeight;
+    //   ctx.fillText(p + '%', paddingLeft - 15, y + 4);
+    // }
 
   loadOrders() {
     const query = { query: 'query { orders { id term amount createdAt rateAtSubmission } }' };

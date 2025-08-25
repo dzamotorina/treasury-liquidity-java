@@ -69,8 +69,8 @@ export class YieldCurveComponent implements OnInit {
     const chartWidth = cssWidth - (paddingLeft + paddingRight);
     const chartHeight = cssHeight - (paddingTop + paddingBottom);
 
-    // Y axis (fixed 1%..7%)
-    const yAxisMin = 1.0, yAxisMax = 7.0, yAxisRange = yAxisMax - yAxisMin;
+    // Y axis (focused scale to avoid crowded labels)
+    const yAxisMin = 3.6, yAxisMax = 5.0, yAxisRange = yAxisMax - yAxisMin;
 
     // Background
     const bgGradient = ctx.createLinearGradient(0, 0, 0, cssHeight);
@@ -79,20 +79,20 @@ export class YieldCurveComponent implements OnInit {
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, cssWidth, cssHeight);
 
-    // Gridlines (horizontal) light dotted
-    ctx.strokeStyle = '#e3e7ea';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
-    for (let p = 1; p <= 7; p++) {
-      const y = cssHeight - paddingBottom - ((p - yAxisMin) / yAxisRange) * chartHeight;
+    // Gridlines (horizontal) every 0.2% to match labels
+    ctx.strokeStyle = '#cfd6dc';
+    ctx.lineWidth = 1.25;
+    ctx.setLineDash([4, 4]);
+    for (let v = yAxisMin; v <= yAxisMax + 1e-6; v += 0.2) {
+      const y = cssHeight - paddingBottom - ((v - yAxisMin) / yAxisRange) * chartHeight;
       ctx.beginPath();
       ctx.moveTo(paddingLeft, y);
       ctx.lineTo(cssWidth - paddingRight, y);
       ctx.stroke();
     }
+    ctx.setLineDash([]); // solid for other strokes
 
     // Axes (solid)
-    ctx.setLineDash([]);
     ctx.strokeStyle = '#495057';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -101,7 +101,7 @@ export class YieldCurveComponent implements OnInit {
     ctx.lineTo(cssWidth - paddingRight, cssHeight - paddingBottom);
     ctx.stroke();
 
-    // Compute points
+    // Compute points (use the same 3.6–5.0% scale)
     const points: {x: number, y: number, value: number}[] = [];
     for (let i = 0; i < data.length; i++) {
       const x = paddingLeft + (i / (data.length - 1)) * chartWidth;
@@ -110,10 +110,8 @@ export class YieldCurveComponent implements OnInit {
     }
 
     // Brighter vertical guide lines from each data point to the X axis
-    // (solid and a bit brighter than grid)
-    ctx.strokeStyle = 'rgba(0, 123, 255, 0.45)'; // brighter guides
+    ctx.strokeStyle = 'rgba(0, 123, 255, 0.45)';
     ctx.lineWidth = 2;
-    ctx.setLineDash([]); // solid
     points.forEach(p => {
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
@@ -169,55 +167,56 @@ export class YieldCurveComponent implements OnInit {
       ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Labels — avoid overlapping the curve/axes
+      // Labels — place higher above the curve
       const label = p.value.toFixed(2) + '%';
       ctx.fillStyle = '#495057';
       ctx.font = 'bold 12px system-ui';
 
-      // default above
-      let labelX = p.x;
-      let labelY = p.y - 14;
+      const labelOffsetAbove = 32;
+      const minGapFromPoint = 24;
 
-      // edges
-      if (i === 0) { ctx.textAlign = 'left';  labelX = p.x + 10; }
+      let labelX = p.x;
+      let labelY = p.y - labelOffsetAbove;
+
+      if (i === 0) { ctx.textAlign = 'left'; labelX = p.x + 10; }
       else if (i === points.length - 1) { ctx.textAlign = 'right'; labelX = p.x - 10; }
       else { ctx.textAlign = 'center'; }
 
-      // clamp within chart content
       const minY = paddingTop + 16;
       const maxY = cssHeight - paddingBottom - 16;
-      labelY = Math.max(minY, Math.min(maxY, labelY));
-
       const minX = paddingLeft + 10;
       const maxX = cssWidth - paddingRight - 10;
-      labelX = Math.max(minX, Math.min(maxX, labelX));
 
-      // If too close to the curve, push a bit more above
-      if (Math.abs(labelY - p.y) < 12) {
-        labelY = Math.max(minY, p.y - 20);
+      labelY = Math.max(minY, Math.min(maxY, labelY));
+      if (labelY > p.y - minGapFromPoint) {
+        labelY = Math.max(minY, p.y - minGapFromPoint);
       }
+
+      labelX = Math.max(minX, Math.min(maxX, labelX));
 
       ctx.fillText(label, labelX, labelY);
     });
 
-    // X labels — move closer to the axis (tighter)
+    // X labels
     ctx.fillStyle = '#495057';
     ctx.font = 'bold 13px system-ui';
     ctx.textAlign = 'center';
     labels.forEach((lab, i) => {
       const x = paddingLeft + (i / (labels.length - 1)) * chartWidth;
-      ctx.fillText(lab, x, cssHeight - paddingBottom + 24); // was ~ -25, now closer
+      ctx.fillText(lab, x, cssHeight - paddingBottom + 24);
     });
 
-    // Y labels
+    // Y labels — ONLY ONE PASS HERE (3.6..5.0 by 0.2)
     ctx.font = '12px system-ui';
     ctx.textAlign = 'right';
-    for (let p = 1; p <= 7; p++) {
-      const y = cssHeight - paddingBottom - ((p - yAxisMin) / yAxisRange) * chartHeight;
-      ctx.fillText(p + '%', paddingLeft - 15, y + 4);
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#495057';
+    for (let v = yAxisMin; v <= yAxisMax + 1e-6; v += 0.2) {
+      const y = cssHeight - paddingBottom - ((v - yAxisMin) / yAxisRange) * chartHeight;
+      ctx.fillText(v.toFixed(1) + '%', paddingLeft - 15, y);
     }
 
-    // Title and subtitle (same)
+    // Title and subtitle
     ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
     ctx.shadowBlur = 2;
     ctx.shadowOffsetY = 1;
