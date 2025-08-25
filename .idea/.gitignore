@@ -6,3 +6,17 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+
+# Angular build artifacts and cache
+frontend/treasury-liquidity-ui/.angular/
+frontend/treasury-liquidity-ui/dist/
+frontend/treasury-liquidity-ui/node_modules/
+
+# Specific Angular cache files
+*.pack
+*.pack.old
+*.json
+
+# Or more specifically for Angular cache:
+**/.angular/cache/
+**/angular-webpack/
