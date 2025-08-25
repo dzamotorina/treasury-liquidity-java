@@ -1,0 +1,15 @@
+# Maven/Gradle build output
+**/target/
+**/build/
+
+# Node/Angular
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
